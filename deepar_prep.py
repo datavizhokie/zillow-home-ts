@@ -13,6 +13,7 @@ import pyspark.sql.functions as f
 from pyspark.sql.types import DoubleType
 from pyspark.sql.functions import lit, isnan
 from pyspark.sql import Window
+from pyspark.ml.feature import StringIndexer
 #import boto3
 
 def retrieve_aws_creds():
@@ -65,7 +66,22 @@ def train_split(df, max_train_date, series_field, granularity):
     return train_data, test_data
 
 
+def string_index(train_data, test_data, input, output):
+    # encoding of categorical fields
+    indexer = StringIndexer(inputCol=input, outputCol=output, handleInvalid="keep")
+    train_data = indexer.fit(train_data).transform(train_data)
+    test_data = indexer.fit(test_data).transform(test_data)
+
+    # Categorical fields need to be INT
+    train_data = train_data.withColumn(output, train_data[output].cast('int'))
+    test_data = test_data.withColumn(output, test_data[output].cast('int'))
+
+    return train_data, test_data
+
+
 def create_array_formats(train_data, test_data, series_field, granularity):
+
+
 
     w = Window.partitionBy(series_field).orderBy(granularity)
 
@@ -74,6 +90,8 @@ def create_array_formats(train_data, test_data, series_field, granularity):
     .groupBy(series_field)\
     .agg(f.max('target').alias('target'), 
         f.min('mindate').alias('start'), 
+        f.min('state_index').alias('cat1'),
+        f.min('city_index').alias('cat2')
     #      f.max('month_list').alias('dynamic_feat1'),
     #      f.max('year_list').alias('dynamic_feat2')
         )
@@ -83,12 +101,19 @@ def create_array_formats(train_data, test_data, series_field, granularity):
     .groupBy(series_field)\
     .agg(f.max('target').alias('target'), 
         f.min('mindate').alias('start'), 
+        f.min('state_index').alias('cat1'),
+        f.min('city_index').alias('cat2')
     #      f.max('month_list').alias('dynamic_feat1'),
     #      f.max('year_list').alias('dynamic_feat2')
         )
 
-    print("Preview of DF with Target arrays by Series:")
-    sorted_list_train.show(5)
+    train_final = sorted_list_train.select(series_field,"start","target", f.array(["cat1","cat2"]).alias("cat"))
+                                                    # f.array(["dynamic_feat"]).alias("dynamic_feat")).persist()
+    test_final  = sorted_list_test.select(series_field,"start","target", f.array(["cat1","cat2"]).alias("cat"))
+                                                #   f.array(["dynamic_feat"]).alias("dynamic_feat")).persist()
+
+    print("Preview of DeepAR input data:")
+    train_final.show(5)
 
     #TODO: add logic for Cat's and DynFeat's
     # train_final = sorted_list_train.select("OFFENSE_CATEGORY_ID","start","target").persist()
@@ -96,7 +121,7 @@ def create_array_formats(train_data, test_data, series_field, granularity):
                                                     #f.array(["dynamic_feat1","dynamic_feat2"]).alias("dynamic_feat")).persist()
     # test_final = ...
 
-    return sorted_list_train, sorted_list_test
+    return train_final, test_final
 
 
 def write_final_to_json(train, test, bucket, pathkey, access_key, secret_key, sc):
@@ -117,8 +142,10 @@ def main():
 
     df_joined = read_create_mindate(file='2bdrm_by_zip_and_yearmonth_median_values.csv', series_field='zip', granularity='year_month', target_field='median_value')
     train_data, test_data = train_split(df=df_joined, max_train_date="2017-12-31", series_field='zip', granularity='year_month')
-    sorted_list_train, sorted_list_test = create_array_formats(train_data=train_data, test_data=test_data, series_field='zip', granularity='year_month')
-    write_final_to_json(train=sorted_list_train, test=sorted_list_test, bucket='zillow-home-ts', pathkey='2bdrm_zip', access_key=access_key, secret_key=secret_key, sc=sc)
+    train_data, test_data = string_index(train_data=train_data, test_data=test_data, input='State', output='state_index')
+    train_data, test_data = string_index(train_data=train_data, test_data=test_data, input='City', output='city_index')
+    train_final, test_final = create_array_formats(train_data=train_data, test_data=test_data, series_field='zip', granularity='year_month')
+    write_final_to_json(train=train_final, test=test_final, bucket='zillow-home-ts', pathkey='2bdrm_zip', access_key=access_key, secret_key=secret_key, sc=sc)
 
 if __name__ == "__main__":
     main()
