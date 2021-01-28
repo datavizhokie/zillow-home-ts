@@ -54,6 +54,7 @@ def train_split(df, max_train_date, series_field, granularity):
 
     train_data = df.filter(df[granularity] <= max_train_date)
     test_data = df
+    validation_set = df.filter(df[granularity] > max_train_date)
 
     print("Training Data Metrics:")
     train_data.agg(f.countDistinct(series_field), f.countDistinct(granularity),\
@@ -61,6 +62,10 @@ def train_split(df, max_train_date, series_field, granularity):
 
     print("Full Test Data Metrics:")
     test_data.agg(f.countDistinct(series_field), f.countDistinct(granularity),\
+        f.min(granularity), f.max(granularity), f.avg('target')).show()
+
+    print("Validation Data Metrics:")
+    validation_set.agg(f.countDistinct(series_field), f.countDistinct(granularity),\
         f.min(granularity), f.max(granularity), f.avg('target')).show()
 
     return train_data, test_data

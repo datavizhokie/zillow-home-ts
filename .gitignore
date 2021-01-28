@@ -1,9 +1,12 @@
 # files and annoying shit
 *.csv
 *.zip
-.vscode/
 *.twb
 *.twbr
+*.ipynb
+*.json
+*.out
+.DS_Store
 
 # Build and Release Folders
 bin-debug/
@@ -13,6 +16,8 @@ bin-release/
 
 # Other files and folders
 .settings/
+preds/
+.vscode/
 
 # Executables
 *.swf

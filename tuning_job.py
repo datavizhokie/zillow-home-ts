@@ -10,7 +10,8 @@ from time import gmtime, strftime, sleep
 import os 
 
 
-bucket = 'zillow-home-ts'
+bucket              = 'zillow-home-ts'
+prediction_cadence  = 'M'
 
 region = boto3.Session(region_name='us-west-2', profile_name='mateosanchez') 
 smclient = boto3.Session(region_name='us-west-2', profile_name='mateosanchez').client('sagemaker')
@@ -18,7 +19,7 @@ smclient = boto3.Session(region_name='us-west-2', profile_name='mateosanchez').c
 sess = sagemaker.Session(boto_session=boto3.Session(region_name='us-west-2', profile_name='mateosanchez'))
 role ='arn:aws:iam::353643785282:role/service-role/AmazonSageMaker-ExecutionRole-20210115T123894'
 
-tuning_job_name = 'zllw-2bd-zip-1996-2017-v1-' + strftime("%H-%m", gmtime())
+tuning_job_name = 'zllw-2bd-zip-1996-2017-v3-' + strftime("%H-%m", gmtime())
 
 print("Tuning Job Name:")
 print(tuning_job_name)
@@ -29,31 +30,31 @@ tuning_job_config = {
       "CategoricalParameterRanges": [],
       "ContinuousParameterRanges": [          
         {
-          "MinValue": "0.0001",
-          "MaxValue": "0.001",
+          "MinValue": "0.00015",
+          "MaxValue": "0.005",
           "Name": "learning_rate"  
           },
       ],
       "IntegerParameterRanges": [
         {
           "MaxValue": "300",
-          "MinValue": "100",
+          "MinValue": "175",
           "Name": "mini_batch_size"
         },
         {
-          "MaxValue": "120",
-          "MinValue": "40",
+          "MaxValue": "100",
+          "MinValue": "30",
           "Name": "num_cells"
         },
         {
-          "MaxValue": "110",
+          "MaxValue": "60",
           "MinValue": "20",
           "Name": "epochs"
         }
       ]
     },
     "ResourceLimits": {
-      "MaxNumberOfTrainingJobs": 4,
+      "MaxNumberOfTrainingJobs": 6,
       "MaxParallelTrainingJobs": 2
     },
     "Strategy": "Bayesian",
@@ -121,7 +122,7 @@ training_job_definition = {
     },
     "RoleArn": role,
     "StaticHyperParameters": {
-    "time_freq": 'W',
+    "time_freq": prediction_cadence,
     "context_length": str(context_length),
     "prediction_length": str(prediction_length),
     #"num_cells": "40",
@@ -131,12 +132,12 @@ training_job_definition = {
     #"mini_batch_size": "32",
     #"learning_rate": "0.001",
     "dropout_rate": "0.15", 
-    "early_stopping_patience": "20",
+    "early_stopping_patience": "8", # Changed to 10 to reduce training times! ***************
     #"num_dynamic_feat": ""
     },
     "StoppingCondition": {
-      # Max 30m per training job
-      "MaxRuntimeInSeconds": 1800
+      # Max 90m per training job
+      "MaxRuntimeInSeconds": 5400
     }
 }
 
