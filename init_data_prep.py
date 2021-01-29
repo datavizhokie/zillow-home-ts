@@ -28,11 +28,12 @@ def transpose(df, drop_fields, key_fields, cadence, series_level):
     df_transposed['year_month_dt'] =  pd.to_datetime(df_transposed['year_month'])
     df_transposed['median_value'] = df_transposed['median_value'].astype(float)
     df_transposed['year_month'] = df_transposed['year_month_dt'].dt.strftime('%Y-%m')
+    df_transposed = df_transposed.drop('year_month_dt', axis=1)
 
     return df_transposed
 
 
-def join_holidays():
+def join_holidays(df1, df_holiday):
     df_holiday['date'] =  pd.to_datetime(df_holiday.date)
     df_holiday['year_month'] = df_holiday['date'].dt.strftime('%Y-%m')
 
@@ -41,7 +42,7 @@ def join_holidays():
 
 
     #join holidays to price data by year_month
-    df_with_feat = df_transposed.merge(df_holiday_grouped, how='left', on='year_month')
+    df_with_feat = df1.merge(df_holiday_grouped, how='left', on='year_month')
     df_with_feat['cnt_holidays'] = df_with_feat['cnt_holidays'].fillna(0)
     print("Transposed Data with Holidays features:")
     print(df_with_feat.tail(5))
@@ -52,7 +53,7 @@ def join_holidays():
 def write(df, file):
 
     try:
-        df_transposed.to_csv(file, index=False)
+        df.to_csv(file, index=False)
         print("Tranposed data written to CSV")
         token = "cheese"
     except:
@@ -65,5 +66,5 @@ def write(df, file):
 df = read_data("Zip_zhvi_bdrmcnt_2_uc_sfrcondo_tier_0.33_0.67_sm_sa_mon.csv", converters={'RegionName': '{:0>5}'.format}, date_parser=False)
 df_holiday = read_data("holiday.csv", converters=None, date_parser='date')
 df_transposed = transpose(df=df, drop_fields=['RegionID','SizeRank','RegionType','StateName','Metro','CountyName'], key_fields=['zip', 'City','State'], cadence='year_month', series_level='zip')
-df_with_feat = join_holidays()
-token = write(df=df_with_feat, file="2bdrm_by_zip_and_yearmonth_median_values.csv")
+df_with_feat = join_holidays(df1=df_transposed, df_holiday=df_holiday)
+token = write(df=df_with_feat, file="2bdrm_by_zip_yearmonth.csv")
