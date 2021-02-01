@@ -19,7 +19,7 @@ smclient = boto3.Session(region_name='us-west-2', profile_name='mateosanchez').c
 sess = sagemaker.Session(boto_session=boto3.Session(region_name='us-west-2', profile_name='mateosanchez'))
 role ='arn:aws:iam::353643785282:role/service-role/AmazonSageMaker-ExecutionRole-20210115T123894'
 
-tuning_job_name = 'zllw-2bd-zip-1996-2017-v3-' + strftime("%H-%m", gmtime())
+tuning_job_name = 'zllw-2bd-zip-1996-2017-v4-' + strftime("%H-%m", gmtime())
 
 print("Tuning Job Name:")
 print(tuning_job_name)
@@ -54,8 +54,8 @@ tuning_job_config = {
       ]
     },
     "ResourceLimits": {
-      "MaxNumberOfTrainingJobs": 6,
-      "MaxParallelTrainingJobs": 2
+      "MaxNumberOfTrainingJobs": 1,
+      "MaxParallelTrainingJobs": 1
     },
     "Strategy": "Bayesian",
     "HyperParameterTuningJobObjective": {
