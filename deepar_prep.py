@@ -50,8 +50,6 @@ def read_create_mindate(file, series_field, granularity, target_field):
     return df_joined
 
 
-
-
 def train_split(df, max_train_date, series_field, granularity):
 
     train_data = df.filter(df[granularity] <= max_train_date)
