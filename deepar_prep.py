@@ -86,45 +86,50 @@ def string_index(train_data, test_data, input, output):
 
 def create_array_formats(train_data, test_data, series_field, granularity):
 
+    # The training data needs to have a dynamic feature array the size of Training+Validation
+    # SLIM TRAINING DATA
+    keep_cols=[series_field, granularity , 'target']
+    train_data_slim = train_data.select([column for column in train_data.columns if column in keep_cols])
 
+    # Join slim training period data back to Full test length dynamic feature data
+    train_data_dynfeat = test_data.select(series_field, "mindate","state_index","city_index", granularity, "cnt_holidays").join(train_data_slim,[series_field,granularity], how='left')
+
+    print("**train_data_dynfeat** preview (Target should be NULL in validation period)")
+    train_data_dynfeat.filter(train_data_dynfeat[granularity] == "2020-02").show(10)
 
     w = Window.partitionBy(series_field).orderBy(granularity)
 
-    sorted_list_train = train_data.withColumn('target', f.collect_list('target').over(w)
-                                        )\
+    sorted_list_train = train_data_dynfeat.withColumn('target', f.collect_list('target').over(w))\
+    .withColumn('cnt_holidays', f.collect_list('cnt_holidays').over(w))\
     .groupBy(series_field)\
     .agg(f.max('target').alias('target'), 
         f.min('mindate').alias('start'), 
         f.min('state_index').alias('cat1'),
-        f.min('city_index').alias('cat2')
-    #      f.max('month_list').alias('dynamic_feat1'),
+        f.min('city_index').alias('cat2'),
+        f.max('cnt_holidays').alias('dynamic_feat1')
     #      f.max('year_list').alias('dynamic_feat2')
         )
 
-    sorted_list_test = test_data.withColumn('target', f.collect_list('target').over(w)
-                                        )\
+    sorted_list_test = test_data.withColumn('target', f.collect_list('target').over(w))\
+    .withColumn('cnt_holidays', f.collect_list('cnt_holidays').over(w))\
     .groupBy(series_field)\
     .agg(f.max('target').alias('target'), 
         f.min('mindate').alias('start'), 
         f.min('state_index').alias('cat1'),
-        f.min('city_index').alias('cat2')
+        f.min('city_index').alias('cat2'),
+        f.max('cnt_holidays').alias('dynamic_feat1')
     #      f.max('month_list').alias('dynamic_feat1'),
     #      f.max('year_list').alias('dynamic_feat2')
         )
 
-    train_final = sorted_list_train.select(series_field,"start","target", f.array(["cat1","cat2"]).alias("cat"))
-                                                    # f.array(["dynamic_feat"]).alias("dynamic_feat")).persist()
-    test_final  = sorted_list_test.select(series_field,"start","target", f.array(["cat1","cat2"]).alias("cat"))
-                                                #   f.array(["dynamic_feat"]).alias("dynamic_feat")).persist()
+    train_final = sorted_list_train.select(series_field,"start","target", f.array(["cat1","cat2"]).alias("cat"),
+    f.array(["dynamic_feat1"]).alias("dynamic_feat"))
 
-    print("Preview of DeepAR input data:")
+    test_final  = sorted_list_test.select(series_field,"start","target", f.array(["cat1","cat2"]).alias("cat"),
+    f.array(["dynamic_feat1"]).alias("dynamic_feat"))
+
+    print("Preview of DeepAR input data w/ Dynamic Feature(s):")
     train_final.show(5)
-
-    #TODO: add logic for Cat's and DynFeat's
-    # train_final = sorted_list_train.select("OFFENSE_CATEGORY_ID","start","target").persist()
-                                       #f.array(["cat2"]).alias("cat"),
-                                                    #f.array(["dynamic_feat1","dynamic_feat2"]).alias("dynamic_feat")).persist()
-    # test_final = ...
 
     return train_final, test_final
 
@@ -145,7 +150,7 @@ def main():
 
     access_key, secret_key = retrieve_aws_creds()
 
-    df_joined = read_create_mindate(file='2bdrm_by_zip_and_yearmonth_median_values.csv', series_field='zip', granularity='year_month', target_field='median_value')
+    df_joined = read_create_mindate(file='2bdrm_by_zip_yearmonth.csv', series_field='zip', granularity='year_month', target_field='median_value')
     train_data, test_data = train_split(df=df_joined, max_train_date="2017-12-31", series_field='zip', granularity='year_month')
     train_data, test_data = string_index(train_data=train_data, test_data=test_data, input='State', output='state_index')
     train_data, test_data = string_index(train_data=train_data, test_data=test_data, input='City', output='city_index')
