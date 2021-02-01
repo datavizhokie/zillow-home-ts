@@ -1,5 +1,6 @@
 import pandas as pd
 import sys
+import numpy as np
 
 
 def read_data(file, converters=None, date_parser=None):
@@ -40,10 +41,13 @@ def join_holidays(df1, df_holiday):
     df_holiday_grouped = df_holiday.groupby('year_month', as_index=False)['holiday_name'].count()\
         .rename(columns={'holiday_name':'cnt_holidays'}).reset_index(drop=True)
 
-
-    #join holidays to price data by year_month
+    # join holidays to price data by year_month
     df_with_feat = df1.merge(df_holiday_grouped, how='left', on='year_month')
     df_with_feat['cnt_holidays'] = df_with_feat['cnt_holidays'].fillna(0)
+
+    # set holiday to null if target is null
+    df_with_feat['cnt_holidays'] = np.where(df_with_feat['median_value'].isnull(), None, df_with_feat['cnt_holidays'])
+
     print("Transposed Data with Holidays features:")
     print(df_with_feat.tail(5))
 
